@@ -149,7 +149,7 @@ func main() {
 			msg[2] = 0
 		}
 		note := Note{midiToNote(msg[1]), msg[1], msg[2]}
-		log.Debugf("%s", note)
+		log.Debugf("%d: %s", numConnected, note)
 		if numConnected > 0 {
 			noteChannel <- note
 		}
@@ -197,10 +197,23 @@ Disallow: /`))
 	} else if strings.HasPrefix(r.URL.Path, "/static") {
 		// special path /static
 		return handleStatic(w, r)
+	} else if strings.HasPrefix(r.URL.Path, "/mp3") {
+		// special path /static
+		return handleMp3(w, r)
 	} else if strings.HasSuffix(r.URL.Path, "/ws") {
 		return handleWebsocket(w, r)
 	}
 	return handleMain(w, r)
+}
+
+func handleMp3(w http.ResponseWriter, r *http.Request) (err error) {
+	b, err := ioutil.ReadFile(r.URL.Path[1:])
+	if err != nil {
+		return
+	}
+	w.Header().Set("Content-Type", "audio/mpeg")
+	_, err = w.Write(b)
+	return err
 }
 
 func handleStatic(w http.ResponseWriter, r *http.Request) (err error) {
@@ -260,6 +273,7 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) (err error) {
 
 	for {
 		note := <-noteChannel
+		log.Debugf("writing note: %+v", note)
 		err = c.WriteJSON(WebsocketMessage{"note", note})
 		if err != nil {
 			log.Debug(err)
