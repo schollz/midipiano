@@ -3,8 +3,8 @@ HASH=$(shell git describe --always)
 LDFLAGS=-ldflags "-s -w -X main.Version=${HASH}"
 
 build:
-	go get -d -v github.com/jteeuwen/go-bindata/...
-	go install -v github.com/jteeuwen/go-bindata/go-bindata
+	# go get -d -v github.com/jteeuwen/go-bindata/...
+	# go install -v github.com/jteeuwen/go-bindata/go-bindata
 	rm -rf assets 
 	cp -r static assets
 	cd assets && gzip -9 -r *
