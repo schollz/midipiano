@@ -280,7 +280,8 @@ sounds['Piano.pp.Gb5.mp3'] = new Howl({ src: ['/mp3s/Piano.pp.Gb5.mp3'] });
 sounds['Piano.pp.Gb6.mp3'] = new Howl({ src: ['/mp3s/Piano.pp.Gb6.mp3'] });
 sounds['Piano.pp.Gb7.mp3'] = new Howl({ src: ['/mp3s/Piano.pp.Gb7.mp3'] });
 
-
+soundPlaying = {}
+soundPlayingName = {}
 
 
         var socket;
@@ -289,12 +290,21 @@ sounds['Piano.pp.Gb7.mp3'] = new Howl({ src: ['/mp3s/Piano.pp.Gb7.mp3'] });
             console.log(event.data);
             if (data.message == "note") {
                 console.log(data.note);
-                var noteName = 'Piano.ff.'+data.note.name+'.mp3';
+                var noteName = 'Piano.mf.'+data.note.name+'.mp3';
+                if (data.note.velocity < 10) {
+                    noteName = 'Piano.pp.'+data.note.name+'.mp3';
+                } else if (data.note.velocity >100) {
+                    noteName = 'Piano.ff.'+data.note.name+'.mp3';
+                }
+
                 console.log(noteName);
                 if (data.note.velocity>0) {
-                    sounds[noteName].play();
+                    soundPlayingName[data.note.name] = noteName;
+                    soundPlaying[noteName] = sounds[noteName].play();
                 } else {
-                    sounds[noteName].stop();
+                    // sounds[noteName].stop();
+                    noteName = soundPlayingName[data.note.name];
+                    sounds[noteName].fade(1,0,500, soundPlaying[noteName]);
                 }
 
             } else if (data.message == "pong") {

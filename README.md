@@ -25,3 +25,14 @@ Then you can run it with
 ```
 
 and open up a browser to localhost:8152 to hear your playing.
+
+
+## Piano sounds
+
+Piano sounds from http://theremin.music.uiowa.edu/MISpiano.html
+
+The first part of the silence is removed with ffmpeg.
+
+```
+for i in *aiff; do ffmpeg -i "$i" -af silenceremove=1:0:-50dB "${i%.*}.mp3"; done
+```
