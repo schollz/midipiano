@@ -102,16 +102,12 @@ func main() {
 	e := midi.NewEncoder(f, midi.SingleTrack, 96)
 	tr := e.NewTrack()
 
-	// 1 beat with 1 note for nothing
-	tr.Add(1, midi.NoteOff(0, 60))
-
 	vel := 90
 	//C3 to B3
-	var j float64
 	for i := 60; i < 72; i++ {
-		tr.Add(j, midi.NoteOn(0, i, vel))
-		tr.Add(1, midi.NoteOff(0, i))
-		j = 1
+		tr.Add(0, midi.NoteOn(0, i, vel))
+		tr.Add(0.5, midi.NoteOff(0, i)) // duration
+		tr.Add(0.5, midi.NoteOff(0, 0)) // rest until next note
 	}
 	tr.Add(1, midi.EndOfTrack())
 
@@ -161,6 +157,49 @@ func main() {
 	// 		log.Debug(m, t, err)
 	// 	}
 	// }
+
+	go func() {
+		time.Sleep(3 * time.Second)
+		log.Debug("starting to load file!")
+		// play a midi file
+
+		f, err := os.Open("midi.mid")
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
+
+		decoder := midi.NewDecoder(f)
+		decoder.Debug = true
+		if err := decoder.Decode(); err != nil {
+			panic(err)
+		}
+
+		fmt.Println("format:", decoder.Format)
+		fmt.Println(decoder.TicksPerQuarterNote, "ticks per quarter")
+		fmt.Println("Debugger on:", decoder.Debug)
+		bpm := 120.0
+		bpms := bpm / 60 / 1000
+		for _, tr := range decoder.Tracks {
+			for _, ev := range tr.Events {
+				time.Sleep(time.Duration(float64(ev.TimeDelta)/float64(decoder.TicksPerQuarterNote)/bpms) * time.Millisecond)
+				log.Debugf("%+v: %d", ev, ev.TimeDelta)
+				if ev.MsgType == 8 || ev.MsgType == 9 {
+					if numConnected > 0 {
+						if ev.MsgType == 8 {
+							ev.Velocity = 0
+						}
+						noteChannel <- Note{
+							Name:     midiToNote(ev.Note),
+							Midi:     ev.Note,
+							Velocity: ev.Velocity,
+						}
+					}
+				}
+
+			}
+		}
+	}()
 
 	err = serve()
 	if err != nil {
