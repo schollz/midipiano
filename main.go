@@ -163,7 +163,7 @@ func main() {
 		log.Debug("starting to load file!")
 		// play a midi file
 
-		f, err := os.Open("midi.mid")
+		f, err := os.Open("Song1.mid")
 		if err != nil {
 			panic(err)
 		}
@@ -178,13 +178,13 @@ func main() {
 		fmt.Println("format:", decoder.Format)
 		fmt.Println(decoder.TicksPerQuarterNote, "ticks per quarter")
 		fmt.Println("Debugger on:", decoder.Debug)
-		bpm := 120.0
+		bpm := 60.0
 		bpms := bpm / 60 / 1000
 		for _, tr := range decoder.Tracks {
 			for _, ev := range tr.Events {
-				time.Sleep(time.Duration(float64(ev.TimeDelta)/float64(decoder.TicksPerQuarterNote)/bpms) * time.Millisecond)
-				log.Debugf("%+v: %d", ev, ev.TimeDelta)
 				if ev.MsgType == 8 || ev.MsgType == 9 {
+					log.Debugf("%+v", ev)
+					log.Debugf("TimeDelta: %d, AbsTicks: %d", ev.TimeDelta, ev.AbsTicks)
 					if numConnected > 0 {
 						if ev.MsgType == 8 {
 							ev.Velocity = 0
@@ -193,6 +193,9 @@ func main() {
 							Name:     midiToNote(ev.Note),
 							Midi:     ev.Note,
 							Velocity: ev.Velocity,
+						}
+						if ev.TimeDelta > 0 {
+							time.Sleep(time.Duration(float64(ev.TimeDelta)/float64(decoder.TicksPerQuarterNote)/bpms) * time.Millisecond)
 						}
 					}
 				}
@@ -312,7 +315,7 @@ func handleWebsocket(w http.ResponseWriter, r *http.Request) (err error) {
 
 	for {
 		note := <-noteChannel
-		log.Debugf("writing note: %+v", note)
+		// log.Debugf("writing note: %+v", note)
 		err = c.WriteJSON(WebsocketMessage{"note", note})
 		if err != nil {
 			log.Debug(err)
