@@ -21,7 +21,7 @@ func main() {
 }
 
 func midi2() (err error) {
-	f, err := os.Open("MidiPieces.mid")
+	f, err := os.Open("Test.mid")
 	if err != nil {
 		panic(err)
 	}
@@ -42,6 +42,14 @@ func midi2() (err error) {
 
 	var bf bytes.Buffer
 	var wr smf.Writer
+	wr = smfwriter.New(&bf, smfwriter.TimeFormat(header.TimeFormat), smfwriter.Format(smf.SMF0))
+	wr.Write(meta.TimeSig{
+		Numerator:                4,
+		Denominator:              4,
+		ClocksPerClick:           24,
+		DemiSemiQuaverPerQuarter: 8,
+	})
+	wr.Write(meta.BPM(90))
 	phraseNum := 0
 	var totalTicks uint32
 	for {
@@ -51,9 +59,12 @@ func midi2() (err error) {
 		if err != nil {
 			break
 		}
-
 		switch v := m.(type) {
+		case channel.ControlChange:
+			fmt.Println(v)
+			wr.Write(v)
 		case channel.NoteOn:
+			fmt.Printf("%d\ton key: %v velocity: %v\n", rd.Delta(), v.Key(), v.Velocity())
 			delta := rd.Delta()
 			if int(rd.Delta()) >= ticksPerQuarterNote*8 {
 				fmt.Println("new phrase")
@@ -78,7 +89,7 @@ func midi2() (err error) {
 				wr.Write(meta.BPM(90))
 				delta = 0
 			}
-			fmt.Printf("%d\ton key: %v velocity: %v\n", rd.Delta(), v.Key(), v.Velocity())
+
 			wr.SetDelta(delta)
 			wr.Write(channel.Channel0.NoteOn(v.Key(), v.Velocity()))
 			totalTicks += delta
