@@ -37,11 +37,13 @@ func midi2() (err error) {
 	if err != nil {
 		return
 	}
+	fmt.Println(ticksPerQuarterNote)
 	var m midi.Message
 
 	var bf bytes.Buffer
 	var wr smf.Writer
 	phraseNum := 0
+	var totalTicks uint32
 	for {
 		m, err = rd.Read()
 
@@ -55,11 +57,16 @@ func midi2() (err error) {
 			delta := rd.Delta()
 			if int(rd.Delta()) >= ticksPerQuarterNote*8 {
 				fmt.Println("new phrase")
+				fmt.Printf("total ticks: %d\n", totalTicks)
+				if int(totalTicks) > ticksPerQuarterNote*4 {
+					err = fmt.Errorf("phrase %d is too long: %d", phraseNum, totalTicks)
+				}
 				if phraseNum > 0 {
 					wr.Write(meta.EndOfTrack)
 					ioutil.WriteFile(fmt.Sprintf("phrase%d.mid", phraseNum), bf.Bytes(), 0644)
 					bf.Reset()
 				}
+				totalTicks = 0
 				phraseNum++
 				wr = smfwriter.New(&bf, smfwriter.TimeFormat(header.TimeFormat), smfwriter.Format(smf.SMF0))
 				wr.Write(meta.TimeSig{
@@ -74,15 +81,17 @@ func midi2() (err error) {
 			fmt.Printf("%d\ton key: %v velocity: %v\n", rd.Delta(), v.Key(), v.Velocity())
 			wr.SetDelta(delta)
 			wr.Write(channel.Channel0.NoteOn(v.Key(), v.Velocity()))
-
+			totalTicks += delta
 		case channel.NoteOff:
 			fmt.Printf("%d\toff key: %v\n", rd.Delta(), v.Key())
 			wr.SetDelta(rd.Delta())
 			wr.Write(channel.Channel0.NoteOff(v.Key()))
+			totalTicks += rd.Delta()
 		}
 
 	}
-
+	fmt.Println("new phrase")
+	fmt.Printf("total ticks: %d\n", totalTicks)
 	wr.Write(meta.EndOfTrack)
 	ioutil.WriteFile(fmt.Sprintf("phrase%d.mid", phraseNum), bf.Bytes(), 0644)
 
