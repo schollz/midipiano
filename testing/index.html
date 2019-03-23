@@ -418,13 +418,13 @@
 					track.notes.forEach(note => {
 						console.log(note);
 						if (note.velocity < -0.2) {
-							sampler_pp.triggerAttackRelease(note.name, note.duration, note.time + now, note
+							sampler_pp.triggerAttack(note.name,note.time + now, note
 							.velocity);
 						} else if (note.velocity > .5) {
-							sampler_ff.triggerAttackRelease(note.name, note.duration, note.time + now, note
+							sampler_ff.triggerAttack(note.name, note.time + now, note
 							.velocity);
 						} else {
-							sampler_mf.triggerAttackRelease(note.name, note.duration, note.time + now, note
+							sampler_mf.triggerAttack(note.name,  note.time + now, note
 							.velocity);
 						}
 

@@ -18,10 +18,38 @@ import (
 
 func main() {
 	fmt.Println(midi2())
+
+	f, err := os.Open("Test.mid")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	rd := smfreader.New(f)
+	err = rd.ReadHeader()
+	if err != nil {
+		panic(err)
+	}
+	header := rd.Header()
+	var bf bytes.Buffer
+	wr := smfwriter.New(&bf, smfwriter.TimeFormat(header.TimeFormat), smfwriter.Format(smf.SMF0))
+	wr.Write(meta.TimeSig{
+		Numerator:                4,
+		Denominator:              4,
+		ClocksPerClick:           24,
+		DemiSemiQuaverPerQuarter: 8,
+	})
+	wr.Write(meta.BPM(90))
+	addMidi("phrase3.mid", &wr)
+	addMidi("phrase3.mid", &wr)
+	addMidi("phrase3.mid", &wr)
+	wr.Write(meta.EndOfTrack)
+	ioutil.WriteFile("combine.mid", bf.Bytes(), 0644)
+
 }
 
-func midi2() (err error) {
-	f, err := os.Open("Test.mid")
+func addMidi(fname string, wr *smf.Writer, channum int) (err error) {
+	f, err := os.Open(fname)
 	if err != nil {
 		panic(err)
 	}
@@ -33,10 +61,66 @@ func midi2() (err error) {
 		return
 	}
 	header := rd.Header()
-	ticksPerQuarterNote, err := strconv.Atoi(strings.Fields(header.TimeFormat.String())[0])
+	foo, err := strconv.Atoi(strings.Fields(header.TimeFormat.String())[0])
 	if err != nil {
 		return
 	}
+	ticksPerQuarterNote := uint32(foo)
+	fmt.Println(ticksPerQuarterNote)
+	var m midi.Message
+
+	ch := channel.Channel0
+	if channum == 1 {
+		ch = channel.Channel1
+	}
+
+	for {
+		m, err = rd.Read()
+		if err != nil {
+			break
+		}
+
+		switch v := m.(type) {
+		case channel.ControlChange:
+			fmt.Println(v)
+			(*wr).Write(v)
+		case channel.NoteOn:
+			fmt.Printf("%d\ton key: %v velocity: %v\n", rd.Delta(), v.Key(), v.Velocity())
+			(*wr).SetDelta(rd.Delta())
+			(*wr).Write(ch.NoteOn(v.Key(), v.Velocity()))
+		case channel.NoteOff:
+			fmt.Printf("%d\toff key: %v\n", rd.Delta(), v.Key())
+			(*wr).SetDelta(rd.Delta())
+			(*wr).Write(ch.NoteOff(v.Key()))
+		}
+
+	}
+
+	if err != smf.ErrFinished {
+		panic("error: " + err.Error())
+	}
+
+	return
+}
+
+func midi2() (err error) {
+	f, err := os.Open("MidiPieces.mid")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	rd := smfreader.New(f)
+	err = rd.ReadHeader()
+	if err != nil {
+		return
+	}
+	header := rd.Header()
+	foo, err := strconv.Atoi(strings.Fields(header.TimeFormat.String())[0])
+	if err != nil {
+		return
+	}
+	ticksPerQuarterNote := uint32(foo)
 	fmt.Println(ticksPerQuarterNote)
 	var m midi.Message
 
@@ -66,13 +150,17 @@ func midi2() (err error) {
 		case channel.NoteOn:
 			fmt.Printf("%d\ton key: %v velocity: %v\n", rd.Delta(), v.Key(), v.Velocity())
 			delta := rd.Delta()
-			if int(rd.Delta()) >= ticksPerQuarterNote*8 {
+			if rd.Delta() >= ticksPerQuarterNote*8 {
 				fmt.Println("new phrase")
 				fmt.Printf("total ticks: %d\n", totalTicks)
-				if int(totalTicks) > ticksPerQuarterNote*4 {
+				if totalTicks > ticksPerQuarterNote*4 {
 					err = fmt.Errorf("phrase %d is too long: %d", phraseNum, totalTicks)
 				}
 				if phraseNum > 0 {
+					if totalTicks < ticksPerQuarterNote*4 {
+						wr.SetDelta(ticksPerQuarterNote*4 - totalTicks)
+						wr.Write(channel.Channel0.NoteOff(60))
+					}
 					wr.Write(meta.EndOfTrack)
 					ioutil.WriteFile(fmt.Sprintf("phrase%d.mid", phraseNum), bf.Bytes(), 0644)
 					bf.Reset()
@@ -103,6 +191,10 @@ func midi2() (err error) {
 	}
 	fmt.Println("new phrase")
 	fmt.Printf("total ticks: %d\n", totalTicks)
+	if totalTicks < ticksPerQuarterNote*4 {
+		wr.SetDelta(ticksPerQuarterNote*4 - totalTicks)
+		wr.Write(channel.Channel0.NoteOff(60))
+	}
 	wr.Write(meta.EndOfTrack)
 	ioutil.WriteFile(fmt.Sprintf("phrase%d.mid", phraseNum), bf.Bytes(), 0644)
 
