@@ -399,6 +399,8 @@
 
 		const synths = []
 		document.querySelector('tone-play-toggle').addEventListener('play', (e) => {
+			currentMidi = new Midi()
+			currentMidi.fromJSON(JSON.parse(document.querySelector("#ResultsText").value));
 			const playing = e.detail
 			if (playing && currentMidi) {
 				const now = Tone.now() + 0.5
